@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taskly - Modern Task Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F8F9FE;
+            overflow: hidden;
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .dropdown-animate {
+            animation: zoomIn 0.2s ease-out;
+        }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .task-card:hover { transform: translateY(-2px); }
+        
+        #task-category option {
+            background-color: white !important;
+            color: #1e1b4b !important;
+            padding: 10px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background-color: #e5e7eb;
+            border: 1px solid #e5e7eb;
+            border-radius: 1.5rem;
+            overflow: hidden;
+        }
+
+        .calendar-day {
+            background-color: white;
+            min-height: 120px;
+            padding: 0.75rem;
+            transition: background-color 0.2s;
+        }
+
+        .calendar-day:hover {
+            background-color: #f9fafb;
+        }
+
+        #login-screen {
+            background: linear-gradient(135deg, #4338ca 0%, #312e81 100%);
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="selection:bg-indigo-100">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center p-6 transition-all duration-700">
+        <div class="max-w-md w-full glass-panel rounded-[3rem] p-10 shadow-2xl text-white text-center animate-in fade-in zoom-in duration-500">
+            <div class="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center shadow-lg mx-auto mb-8">
+                <i data-lucide="check" class="text-indigo-600 w-10 h-10"></i>
+            </div>
+            <h2 class="text-3xl font-black mb-2 tracking-tight">Welcome to Taskly</h2>
+            <p class="text-indigo-100/60 font-medium mb-10">Enter your name to start managing tasks.</p>
+            
+            <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2 ml-4">First Name</label>
+                    <input id="login-first" type="text" required class="w-full bg-white/10 border border-white/10 rounded-2xl py-4 px-6 font-bold outline-none focus:bg-white/20 focus:border-white/30 transition-all placeholder:text-white/20" placeholder="e.g. Alex">
+                </div>
+                <div>
+                    <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2 ml-4">Last Name</label>
+                    <input id="login-last" type="text" required class="w-full bg-white/10 border border-white/10 rounded-2xl py-4 px-6 font-bold outline-none focus:bg-white/20 focus:border-white/30 transition-all placeholder:text-white/20" placeholder="e.g. Rivera">
+                </div>
+                <button type="submit" class="w-full bg-white text-indigo-700 py-5 rounded-2xl font-black text-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all mt-6">
+                    Launch Dashboard
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app" class="flex min-h-screen opacity-0 transition-opacity duration-700">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-64 bg-indigo-700 text-white transform -translate-x-full lg:translate-x-0 transition-transform duration-300 lg:static">
+            <div class="p-8 flex flex-col h-full">
+                <div class="flex items-center justify-between mb-10">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-white rounded-2xl flex items-center justify-center shadow-lg">
+                            <i data-lucide="check" class="text-indigo-600 w-6 h-6"></i>
+                        </div>
+                        <h2 class="text-2xl font-black tracking-tighter">Taskly</h2>
+                    </div>
+                    <button class="lg:hidden p-2 hover:bg-white/10 rounded-xl" onclick="toggleSidebar()">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <nav class="space-y-2 flex-1">
+                    <button onclick="handleNavClick('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center space-x-3 px-4 py-3 rounded-2xl bg-white/20 transition-all">
+                        <i data-lucide="home" class="w-5 h-5"></i>
+                        <span class="font-semibold">Dashboard</span>
+                    </button>
+                    <button onclick="handleNavClick('calendar')" id="nav-calendar" class="nav-item w-full flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-white/10 transition-all">
+                        <i data-lucide="calendar" class="w-5 h-5"></i>
+                        <span class="font-semibold">Calendar</span>
+                    </button>
+                </nav>
+                <div class="pt-6 border-t border-white/10">
+                    <button onclick="logout()" class="w-full flex items-center space-x-3 px-4 py-3 opacity-70 hover:opacity-100 hover:bg-white/10 rounded-2xl transition-all">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                        <span class="font-semibold">Sign Out</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 h-screen overflow-y-auto no-scrollbar relative">
+            <!-- Header -->
+            <header class="p-6 flex justify-between items-center sticky top-0 bg-[#F8F9FE]/80 backdrop-blur-md z-40">
+                <div class="flex items-center space-x-4">
+                    <button class="lg:hidden p-2 bg-white rounded-xl shadow-sm border border-gray-100" onclick="toggleSidebar()">
+                        <i data-lucide="menu" class="w-5 h-5 text-gray-600"></i>
+                    </button>
+                    <h1 id="page-title" class="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h1>
+                </div>
+
+                <div class="flex items-center space-x-4">
+                    <div id="view-toggle" class="bg-gray-100 p-1 rounded-xl flex items-center">
+                        <button onclick="setView('list')" id="btn-list" class="p-2 rounded-lg transition-all text-gray-400 hover:text-gray-600">
+                            <i data-lucide="list" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="setView('board')" id="btn-board" class="p-2 rounded-lg bg-white shadow-sm text-indigo-600 transition-all">
+                            <i data-lucide="columns" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="setView('calendar')" id="btn-calendar-view" class="p-2 rounded-lg transition-all text-gray-400 hover:text-gray-600">
+                            <i data-lucide="calendar-days" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <!-- Profile Dropdown -->
+                    <div class="relative" id="profile-container">
+                        <button id="avatar-btn" onclick="toggleProfileMenu()" class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg hover:scale-105 transition-all ring-4 ring-white">
+                            <span id="avatar-initial">G</span>
+                        </button>
+                        <div id="profile-menu" class="hidden absolute right-0 mt-3 w-72 bg-white rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden dropdown-animate z-50">
+                            <div class="p-6 bg-indigo-50/50">
+                                <div class="flex items-center space-x-4 mb-4">
+                                    <div class="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl font-black" id="menu-avatar-initial">G</div>
+                                    <div>
+                                        <h4 class="font-black text-gray-900 leading-tight" id="display-name">Guest User</h4>
+                                        <p class="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">Active Member</p>
+                                    </div>
+                                </div>
+                                <div id="profile-view-state">
+                                    <button onclick="showProfileEdit()" class="w-full py-3 bg-white border border-indigo-100 rounded-xl text-indigo-600 text-xs font-black flex items-center justify-center space-x-2 hover:bg-indigo-600 hover:text-white transition-all shadow-sm">
+                                        <i data-lucide="edit-2" class="w-3 h-3"></i>
+                                        <span>Edit Profile</span>
+                                    </button>
+                                </div>
+                                <div id="profile-edit-state" class="hidden space-y-3">
+                                    <input id="edit-first" type="text" placeholder="First Name" class="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm font-bold outline-none focus:border-indigo-600">
+                                    <input id="edit-last" type="text" placeholder="Last Name" class="w-full bg-white border border-gray-200 rounded-xl py-2 px-3 text-sm font-bold outline-none focus:border-indigo-600">
+                                    <div class="flex space-x-2">
+                                        <button onclick="saveProfile()" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black flex items-center justify-center space-x-2">
+                                            <i data-lucide="save" class="w-3 h-3"></i>
+                                            <span>Save</span>
+                                        </button>
+                                        <button onclick="hideProfileEdit()" class="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl text-xs font-black">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="px-6 py-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div class="mb-8">
+                    <h2 class="text-4xl font-black text-gray-900">Hello, <span id="welcome-name">Guest</span>!</h2>
+                    <p class="text-gray-400 font-medium">Here's your task overview for today.</p>
+                </div>
+                <!-- Kanban Board -->
+                <div id="board-container" class="flex flex-col lg:flex-row gap-6 overflow-x-auto no-scrollbar pb-10"></div>
+                <!-- List View -->
+                <div id="list-container" class="hidden space-y-3 pb-24"></div>
+            </div>
+
+            <!-- Calendar View -->
+            <div id="calendar-view-container" class="hidden px-6 py-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h2 id="calendar-month-year" class="text-3xl font-black text-gray-900">Month Year</h2>
+                        <p class="text-gray-400 font-medium">Your schedule at a glance.</p>
+                    </div>
+                    <div class="flex items-center bg-white rounded-2xl shadow-sm border border-gray-100 p-1">
+                        <button onclick="changeMonth(-1)" class="p-2 hover:bg-gray-50 rounded-xl transition-all">
+                            <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                        </button>
+                        <button onclick="goToToday()" class="px-4 py-2 text-xs font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">Today</button>
+                        <button onclick="changeMonth(1)" class="p-2 hover:bg-gray-50 rounded-xl transition-all">
+                            <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="calendar-grid mb-24" id="calendar-grid"></div>
+            </div>
+
+            <!-- Task Modal -->
+            <div id="task-modal" class="hidden fixed inset-0 z-[60] bg-indigo-600 text-white p-8 overflow-y-auto">
+                <div class="max-w-xl mx-auto">
+                    <button onclick="closeModal()" class="p-3 bg-white/10 rounded-2xl mb-8 flex items-center space-x-2 hover:bg-white/20 transition-all">
+                        <i data-lucide="arrow-left" class="w-6 h-6"></i>
+                        <span class="font-bold text-sm pr-2">Back to Dashboard</span>
+                    </button>
+                    <h2 id="modal-title" class="text-4xl font-black mb-12 text-white">Create New Task</h2>
+                    <div class="space-y-8">
+                        <div>
+                            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2">Title</label>
+                            <input id="task-title" type="text" class="w-full bg-transparent border-b-2 border-white/20 py-4 text-2xl font-black outline-none focus:border-white transition-all placeholder:text-white/20" placeholder="What's the goal?">
+                        </div>
+                        <div class="space-y-4">
+                            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2">Category</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <select id="task-category" class="w-full bg-white/10 rounded-2xl p-4 font-bold outline-none border border-white/10 appearance-none cursor-pointer hover:bg-white/20 transition-all text-white"></select>
+                                <div class="relative group">
+                                    <input id="new-category-input" type="text" class="w-full bg-white/10 rounded-2xl p-4 font-bold outline-none border border-white/10 placeholder:text-white/30 focus:bg-white/20 transition-all" placeholder="New Category...">
+                                    <button onclick="addNewCategory()" class="absolute right-2 top-2 p-2 bg-white text-indigo-600 rounded-xl shadow-lg hover:scale-105 transition-all">
+                                        <i data-lucide="plus" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                            <div>
+                                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2">Due Date</label>
+                                <div class="relative bg-white/10 rounded-2xl p-4 border border-white/10">
+                                    <input id="task-date" type="date" class="bg-transparent w-full font-bold outline-none text-white z-10 relative">
+                                    <i data-lucide="calendar" class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 opacity-40"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 block mb-2">Priority</label>
+                                <div class="flex bg-white/10 rounded-2xl p-1">
+                                    <button onclick="setPriority('Low')" id="p-Low" class="priority-btn flex-1 py-3 rounded-xl text-xs font-black transition-all">Low</button>
+                                    <button onclick="setPriority('Medium')" id="p-Medium" class="priority-btn flex-1 py-3 rounded-xl text-xs font-black bg-white text-indigo-600 shadow-lg">Medium</button>
+                                    <button onclick="setPriority('High')" id="p-High" class="priority-btn flex-1 py-3 rounded-xl text-xs font-black transition-all">High</button>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="saveTask()" class="w-full bg-white text-indigo-600 py-6 rounded-[2rem] font-black text-lg shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all mt-6">Create Task</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Floating Action Button -->
+            <button id="fab" onclick="openModal()" class="fixed bottom-8 right-8 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all shadow-indigo-200/50 z-40">
+                <i data-lucide="plus" class="w-8 h-8"></i>
+            </button>
+        </main>
+    </div>
+
+    <script>
+        // Global State
+        let user = { firstName: '', lastName: '' };
+        let currentSection = 'dashboard';
+        let viewMode = 'board';
+        let categories = ["Design", "Dev", "Marketing", "Strategy"];
+        let tasks = [
+            { id: 1, title: 'Draft system architecture', priority: 'High', date: '2024-05-20', status: 'In Progress', category: 'Dev' },
+            { id: 2, title: 'Client onboarding meeting', priority: 'Medium', date: '2024-05-20', status: 'To Do', category: 'Strategy' },
+            { id: 3, title: 'Update style guide', priority: 'Low', date: '2024-05-21', status: 'Done', category: 'Design' }
+        ];
+        let editingTaskId = null;
+        let selectedPriority = 'Medium';
+        let currentDate = new Date();
+
+        function refreshIcons() { lucide.createIcons(); }
+
+        // Logic: Sequential Progression
+        // To Do -> In Progress -> Done
+        function advanceStatus(id) {
+            tasks = tasks.map(t => {
+                if (t.id === id) {
+                    if (t.status === 'To Do') return { ...t, status: 'In Progress' };
+                    if (t.status === 'In Progress') return { ...t, status: 'Done' };
+                }
+                return t;
+            });
+            viewMode === 'calendar' ? renderCalendar() : renderDashboard();
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const first = document.getElementById('login-first').value.trim();
+            const last = document.getElementById('login-last').value.trim();
+            if (first && last) {
+                user.firstName = first; user.lastName = last;
+                updateUserUI();
+                document.getElementById('login-screen').classList.add('opacity-0', 'pointer-events-none');
+                document.getElementById('app').classList.remove('opacity-0');
+                setTimeout(() => document.getElementById('login-screen').style.display = 'none', 700);
+            }
+        }
+
+        function updateUserUI() {
+            const i = user.firstName.charAt(0).toUpperCase() || 'G';
+            document.getElementById('avatar-initial').innerText = i;
+            document.getElementById('menu-avatar-initial').innerText = i;
+            document.getElementById('display-name').innerText = `${user.firstName} ${user.lastName}`;
+            document.getElementById('welcome-name').innerText = user.firstName;
+        }
+
+        function setView(mode) {
+            viewMode = mode;
+            const dashboard = document.getElementById('view-dashboard');
+            const calendar = document.getElementById('calendar-view-container');
+            [dashboard, calendar].forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('#view-toggle button').forEach(b => b.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600'));
+
+            if (mode === 'calendar') {
+                calendar.classList.remove('hidden');
+                document.getElementById('btn-calendar-view').classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+                renderCalendar();
+            } else {
+                dashboard.classList.remove('hidden');
+                document.getElementById(`btn-${mode}`).classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+                renderDashboard();
+            }
+        }
+
+        function renderDashboard() {
+            const board = document.getElementById('board-container');
+            const list = document.getElementById('list-container');
+            
+            if (viewMode === 'board') {
+                board.classList.remove('hidden');
+                list.classList.add('hidden');
+                const columns = ["To Do", "In Progress", "Done"];
+                board.innerHTML = columns.map(col => `
+                    <div class="flex-1 min-w-[300px] flex flex-col">
+                        <div class="flex items-center space-x-2 mb-4 px-2">
+                            <span class="w-2 h-2 rounded-full ${col === 'Done' ? 'bg-green-500' : col === 'In Progress' ? 'bg-indigo-500' : 'bg-gray-400'}"></span>
+                            <h3 class="font-black text-gray-800 text-sm uppercase tracking-widest">${col}</h3>
+                        </div>
+                        <div class="flex-1 rounded-[2.5rem] p-4 ${col === 'Done' ? 'bg-green-50' : col === 'In Progress' ? 'bg-indigo-50' : 'bg-gray-100'} space-y-3 min-h-[500px]">
+                            ${tasks.filter(t => t.status === col).map(t => `
+                                <div class="bg-white p-5 rounded-[2rem] shadow-sm border border-gray-100/50 task-card transition-all">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <span class="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${t.priority === 'High' ? 'bg-red-100 text-red-600' : t.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}">${t.priority}</span>
+                                        <button onclick="deleteTask(${t.id})" class="p-1 text-gray-400 hover:text-red-500"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                                    </div>
+                                    <h4 class="font-bold text-sm mb-3 ${t.status === 'Done' ? 'line-through opacity-50' : ''}">${t.title}</h4>
+                                    <div class="flex items-center justify-between pt-3 border-t border-gray-50">
+                                        <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest">${t.category}</span>
+                                        ${t.status !== 'Done' ? `
+                                        <button onclick="advanceStatus(${t.id})" class="p-1.5 rounded-xl ${t.status === 'In Progress' ? 'bg-indigo-600' : 'bg-gray-50'} text-white flex items-center justify-center">
+                                            <i data-lucide="check" class="w-4 h-4 ${t.status === 'To Do' ? 'text-gray-300' : 'text-white'}"></i>
+                                        </button>` : `<div class="p-1.5 bg-green-500 rounded-xl text-white"><i data-lucide="check" class="w-4 h-4"></i></div>`}
+                                    </div>
+                                </div>`).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                board.classList.add('hidden');
+                list.classList.remove('hidden');
+                list.innerHTML = tasks.map(t => `
+                    <div class="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-between group">
+                        <div class="flex items-center space-x-4">
+                            <button onclick="advanceStatus(${t.id})" class="w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${t.status === 'Done' ? 'bg-green-500 border-green-500 text-white' : t.status === 'In Progress' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200'}">
+                                <i data-lucide="check" class="w-4 h-4"></i>
+                            </button>
+                            <h4 class="font-bold text-sm ${t.status === 'Done' ? 'line-through text-gray-400' : ''}">${t.title}</h4>
+                        </div>
+                        <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded-lg">${t.category}</span>
+                    </div>`).join('');
+            }
+            refreshIcons();
+        }
+
+        // Calendar Logic
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const monthLabel = document.getElementById('calendar-month-year');
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            monthLabel.innerText = `${new Intl.DateTimeFormat('en-US', { month: 'long' }).format(currentDate)} ${year}`;
+            
+            grid.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => `<div class="bg-gray-50 py-3 text-center text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">${d}</div>`).join('');
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const prevMonthDays = new Date(year, month, 0).getDate();
+
+            for (let i = firstDay - 1; i >= 0; i--) grid.appendChild(createDayEl(prevMonthDays - i, true));
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                grid.appendChild(createDayEl(i, false, false, dateStr));
+            }
+            refreshIcons();
+        }
+
+        function createDayEl(dayNum, isOther, isToday, dateStr) {
+            const div = document.createElement('div');
+            div.className = `calendar-day ${isOther ? 'text-gray-300' : ''}`;
+            let html = `<span class="text-xs font-black">${dayNum}</span>`;
+            if (!isOther) {
+                const dayTasks = tasks.filter(t => t.date === dateStr);
+                html += `<div class="mt-2 space-y-1">` + dayTasks.map(t => `
+                    <div class="text-[8px] font-bold p-1 rounded truncate ${t.status === 'Done' ? 'bg-green-50 text-green-600' : 'bg-indigo-50 text-indigo-600'}">
+                        ${t.title}
+                    </div>`).join('') + `</div>`;
+            }
+            div.innerHTML = html;
+            return div;
+        }
+
+        // Sidebar & Auth
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function handleNavClick(s) { if (s === 'calendar') setView('calendar'); else setView('board'); if (window.innerWidth < 1024) toggleSidebar(); }
+        function logout() { location.reload(); }
+
+        // Modal & CRUD
+        function openModal() { document.getElementById('task-modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('task-modal').classList.add('hidden'); }
+        function setPriority(p) { 
+            selectedPriority = p; 
+            document.querySelectorAll('.priority-btn').forEach(b => b.classList.remove('bg-white', 'text-indigo-600', 'shadow-lg'));
+            document.getElementById(`p-${p}`).classList.add('bg-white', 'text-indigo-600', 'shadow-lg');
+        }
+        function saveTask() {
+            const title = document.getElementById('task-title').value;
+            const date = document.getElementById('task-date').value;
+            if (!title) return;
+            tasks.unshift({
+                id: Date.now(),
+                title,
+                date: date || '2024-05-20',
+                priority: selectedPriority,
+                category: document.getElementById('task-category').value,
+                status: 'To Do'
+            });
+            closeModal();
+            renderDashboard();
+        }
+        function deleteTask(id) { tasks = tasks.filter(t => t.id !== id); renderDashboard(); }
+        function addNewCategory() {
+            const val = document.getElementById('new-category-input').value;
+            if (val) { categories.push(val); updateCategoryDropdown(); }
+        }
+        function updateCategoryDropdown() {
+            document.getElementById('task-category').innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+        function changeMonth(d) { currentDate.setMonth(currentDate.getMonth() + d); renderCalendar(); }
+        function goToToday() { currentDate = new Date(); renderCalendar(); }
+
+        // Profile Logic
+        function toggleProfileMenu() { document.getElementById('profile-menu').classList.toggle('hidden'); }
+        function showProfileEdit() { document.getElementById('profile-view-state').classList.add('hidden'); document.getElementById('profile-edit-state').classList.remove('hidden'); }
+        function hideProfileEdit() { document.getElementById('profile-view-state').classList.remove('hidden'); document.getElementById('profile-edit-state').classList.add('hidden'); }
+        function saveProfile() {
+            const f = document.getElementById('edit-first').value;
+            const l = document.getElementById('edit-last').value;
+            if (f && l) { user.firstName = f; user.lastName = l; updateUserUI(); hideProfileEdit(); }
+        }
+
+        // Init
+        updateCategoryDropdown();
+        renderDashboard();
+        refreshIcons();
+    </script>
+</body>
+</html>
